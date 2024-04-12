@@ -17,6 +17,7 @@ void change_dir(char *newdir)
 {
     if (!(newdir && strcmp(dirname, newdir) != 0 && is_valid_dir(newdir))) {
         log_error("cd failed: %s", newdir);
+        free(newdir);
         return;
     }
 
