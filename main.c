@@ -101,6 +101,10 @@ int main(int argc, const char *argv[])
             change_dir(path_join(dirname, file_vec[y]));
         } else if (ch == 'h' || ch == '-') {
             change_dir(get_parent(dirname));
+        } else if (ch == 'g') {
+            y = 0;
+        } else if (ch == 'G') {
+            y = MAX(0, num_files(file_vec)-1);
         }
     }
 
