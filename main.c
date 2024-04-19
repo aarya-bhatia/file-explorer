@@ -8,10 +8,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+struct Window {
+    int start_line;
+    int end_line;
+};
+
 char **file_vec = NULL;
 char *dirname = NULL;
 int path_changed = 0;
 int y = 0;
+
+struct Window file_window;
 
 void change_dir(char *newdir)
 {
@@ -25,7 +32,18 @@ void change_dir(char *newdir)
     dirname = newdir;
     log_debug("cd: %s", dirname);
     path_changed = 1;
-    y = 0;
+    y = file_window.start_line;
+}
+
+void display_files()
+{
+    for (int i = file_window.start_line; i < file_window.end_line && file_vec[i] != NULL; i++) {
+        move(i, 0);
+        clrtoeol();
+        printw("%s\n", file_vec[i]);
+    }
+
+    move(y, file_window.start_line);
 }
 
 int main(int argc, const char *argv[])
@@ -58,6 +76,9 @@ int main(int argc, const char *argv[])
     noecho();
     keypad(stdscr, TRUE);
 
+    file_window.start_line = 0;
+    file_window.end_line = LINES - 1;
+
     // main loop
     while (1) {
         erase();
@@ -79,22 +100,18 @@ int main(int argc, const char *argv[])
             file_vec = new_file_vec;
         }
 
-        for (int i = 0; i < LINES && file_vec[i] != NULL; i++) {
-            printw("%s\n", file_vec[i]);
-        }
-
-        move(y, 0);
+        display_files();
         refresh();
 
         int ch = getch();
         if (ch == 'q') {
             break;
         } else if (ch == KEY_DOWN || ch == 'j') {
-            if (y < LINES - 1 && y < num_files(file_vec) - 1) {
+            if (y < file_window.end_line && y < num_files(file_vec) - 1) {
                 y++;
             }
         } else if (ch == KEY_UP || ch == 'k') {
-            if (y > 0) {
+            if (y > file_window.start_line) {
                 y--;
             }
         } else if (ch == '\n' || ch == 'l') {
@@ -102,9 +119,9 @@ int main(int argc, const char *argv[])
         } else if (ch == 'h' || ch == '-') {
             change_dir(get_parent(dirname));
         } else if (ch == 'g') {
-            y = 0;
+            y = file_window.start_line;
         } else if (ch == 'G') {
-            y = MAX(0, num_files(file_vec)-1);
+            y = MIN(file_window.end_line, num_files(file_vec) - 1);
         }
     }
 
