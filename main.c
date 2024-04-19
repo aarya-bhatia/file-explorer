@@ -1,5 +1,6 @@
 #include "log.h"
 #include "util.h"
+#include <assert.h>
 #include <fcntl.h>
 #include <ncurses.h>
 #include <stdlib.h>
@@ -19,6 +20,25 @@ int path_changed = 0;
 int y = 0;
 
 struct Window file_window;
+struct Window status_window;
+
+const char *username;
+char hostname[100];
+
+int get_last_line()
+{
+    return MIN(file_window.end_line, file_window.start_line + num_files(file_vec) - 1);
+}
+
+int count_window_lines(struct Window w)
+{
+    return w.end_line - w.start_line + 1;
+}
+
+const char *get_selected_file()
+{
+    return file_vec[y - file_window.start_line];
+}
 
 void change_dir(char *newdir)
 {
@@ -35,15 +55,22 @@ void change_dir(char *newdir)
     y = file_window.start_line;
 }
 
+void display_status()
+{
+    move(0, 0);
+    printw("%s@%s:%s/%s\n\n", username, hostname, dirname, get_selected_file());
+    /* printw("%s\n\n", dirname); */
+}
+
 void display_files()
 {
-    for (int i = file_window.start_line; i < file_window.end_line && file_vec[i] != NULL; i++) {
-        move(i, 0);
-        clrtoeol();
+    for (int i = 0; i < count_window_lines(file_window) && file_vec[i] != NULL; i++) {
+        move(i + file_window.start_line, 0);
+        /* clrtoeol(); */
         printw("%s\n", file_vec[i]);
     }
 
-    move(y, file_window.start_line);
+    move(y, 0);
 }
 
 int main(int argc, const char *argv[])
@@ -71,18 +98,26 @@ int main(int argc, const char *argv[])
 
     log_debug("current directory: %s", dirname);
 
+    gethostname(hostname, sizeof hostname - 1);
+
+    username = getenv("USER");
+    assert(username);
+
     initscr();
     raw();
     noecho();
     keypad(stdscr, TRUE);
 
-    file_window.start_line = 0;
+    status_window.start_line = 0;
+    status_window.end_line = 1;
+
+    file_window.start_line = 2;
     file_window.end_line = LINES - 1;
+
+    y = file_window.start_line;
 
     // main loop
     while (1) {
-        erase();
-
         if (!file_vec || path_changed) {
             char **new_file_vec = list_files(dirname);
             if (new_file_vec == NULL) {
@@ -100,6 +135,8 @@ int main(int argc, const char *argv[])
             file_vec = new_file_vec;
         }
 
+        erase();
+        display_status();
         display_files();
         refresh();
 
@@ -107,7 +144,7 @@ int main(int argc, const char *argv[])
         if (ch == 'q') {
             break;
         } else if (ch == KEY_DOWN || ch == 'j') {
-            if (y < file_window.end_line && y < num_files(file_vec) - 1) {
+            if (y < get_last_line()) {
                 y++;
             }
         } else if (ch == KEY_UP || ch == 'k') {
@@ -115,13 +152,13 @@ int main(int argc, const char *argv[])
                 y--;
             }
         } else if (ch == '\n' || ch == 'l') {
-            change_dir(path_join(dirname, file_vec[y]));
+            change_dir(path_join(dirname, get_selected_file()));
         } else if (ch == 'h' || ch == '-') {
             change_dir(get_parent(dirname));
         } else if (ch == 'g') {
             y = file_window.start_line;
         } else if (ch == 'G') {
-            y = MIN(file_window.end_line, num_files(file_vec) - 1);
+            y = get_last_line();
         }
     }
 
