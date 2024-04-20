@@ -20,7 +20,8 @@ int path_changed = 0;
 int y = 0;
 
 struct Window file_window;
-struct Window status_window;
+struct Window top_window;
+struct Window bottom_window;
 
 const char *username;
 char hostname[100];
@@ -55,22 +56,26 @@ void change_dir(char *newdir)
     y = file_window.start_line;
 }
 
-void display_status()
+void display_top()
 {
-    move(0, 0);
-    printw("%s@%s:%s/%s\n\n", username, hostname, dirname, get_selected_file());
-    /* printw("%s\n\n", dirname); */
+    if (strcmp(dirname, "/") == 0) {
+        printw("%s@%s:/%s\n\n", username, hostname, get_selected_file());
+    } else {
+        printw("%s@%s:%s/%s\n\n", username, hostname, dirname, get_selected_file());
+    }
 }
 
 void display_files()
 {
     for (int i = 0; i < count_window_lines(file_window) && file_vec[i] != NULL; i++) {
         move(i + file_window.start_line, 0);
-        /* clrtoeol(); */
         printw("%s\n", file_vec[i]);
     }
+}
 
-    move(y, 0);
+void display_bottom()
+{
+    printw("\n[%d/%zu]\n", y - file_window.start_line, num_files(file_vec));
 }
 
 int main(int argc, const char *argv[])
@@ -108,11 +113,14 @@ int main(int argc, const char *argv[])
     noecho();
     keypad(stdscr, TRUE);
 
-    status_window.start_line = 0;
-    status_window.end_line = 1;
+    top_window.start_line = 0;
+    top_window.end_line = 1;
 
-    file_window.start_line = 2;
-    file_window.end_line = LINES - 1;
+    file_window.start_line = top_window.end_line + 1;
+    file_window.end_line = MIN(LINES / 2, 20);
+
+    bottom_window.start_line = file_window.end_line + 2;
+    bottom_window.end_line = bottom_window.start_line + 1;
 
     y = file_window.start_line;
 
@@ -136,8 +144,11 @@ int main(int argc, const char *argv[])
         }
 
         erase();
-        display_status();
+        move(0, 0);
+        display_top();
         display_files();
+        display_bottom();
+        move(y, 0);
         refresh();
 
         int ch = getch();
