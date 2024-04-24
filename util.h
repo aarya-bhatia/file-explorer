@@ -19,3 +19,4 @@ bool is_valid_dir(const char *dirname);
 
 void get_human_size(size_t value, char *buffer, size_t n);
 void get_human_time(struct timespec t, char *buffer, size_t n);
+void get_perm_string(int perms, char *buffer, size_t n);

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 
 size_t num_files(char **vector)
@@ -98,3 +99,68 @@ void get_human_time(struct timespec t, char *buffer, size_t n)
     strftime(buffer, n, "%Y-%m-%d %H:%M:%S", &tm);
 }
 
+void get_perm_string(int perms, char *buffer, size_t n)
+{
+    if (n < 9) {
+        buffer[0] = 0;
+        return;
+    }
+
+    int i = 0;
+
+    if (perms & S_IRUSR) {
+        buffer[i++] = 'r';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IWUSR) {
+        buffer[i++] = 'w';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IXUSR) {
+        buffer[i++] = 'x';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IRGRP) {
+        buffer[i++] = 'r';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IWGRP) {
+        buffer[i++] = 'w';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IXGRP) {
+        buffer[i++] = 'x';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IROTH) {
+        buffer[i++] = 'r';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IWOTH) {
+        buffer[i++] = 'w';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    if (perms & S_IXOTH) {
+        buffer[i++] = 'x';
+    } else {
+        buffer[i++] = '-';
+    }
+
+    buffer[i] = 0;
+}

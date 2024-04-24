@@ -55,5 +55,11 @@ int main()
     get_human_time(ts, buffer, sizeof buffer - 1);
     puts(buffer);
 
+    get_perm_string(0644, buffer, sizeof buffer - 1);
+    puts(buffer);
+
+    get_perm_string(0755, buffer, sizeof buffer - 1);
+    puts(buffer);
+
     return 0;
 }

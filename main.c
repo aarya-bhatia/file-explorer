@@ -80,11 +80,10 @@ void display_files()
         wprintw(file_window, "%-6s", buffer);
 
         get_human_time(file_stats[i].st_mtim, buffer, sizeof buffer - 1);
-        wprintw(file_window, "%-16s", buffer);
+        wprintw(file_window, "%-20s", buffer);
 
-        /* wprintw(file_window, "%6zu ", file_stats[i].st_size); */
-        /* wprintw(file_window, "%6o ", file_stats[i].st_mode); */
-        /* wprintw(file_window, "%d ", file_stats[i].st_mtim); */
+        get_perm_string(file_stats[i].st_mode, buffer, sizeof buffer - 1);
+        wprintw(file_window, "%-16s", buffer);
 
         wprintw(file_window, "\n");
     }
