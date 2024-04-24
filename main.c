@@ -66,6 +66,8 @@ void display_files()
         longest_name = MAX(longest_name, strlen(file_vec[i]));
     }
 
+    char buffer[256];
+
     for (int i = 0; i < max_files && file_vec[i] != NULL; i++) {
         wprintw(file_window, "%s", file_vec[i]);
 
@@ -74,8 +76,14 @@ void display_files()
             wprintw(file_window, " ");
         }
 
-        wprintw(file_window, "%6zu ", file_stats[i].st_size);
-        wprintw(file_window, "%6o ", file_stats[i].st_mode);
+        get_human_size(file_stats[i].st_size, buffer, sizeof buffer - 1);
+        wprintw(file_window, "%-6s", buffer);
+
+        get_human_time(file_stats[i].st_mtim, buffer, sizeof buffer - 1);
+        wprintw(file_window, "%-16s", buffer);
+
+        /* wprintw(file_window, "%6zu ", file_stats[i].st_size); */
+        /* wprintw(file_window, "%6o ", file_stats[i].st_mode); */
         /* wprintw(file_window, "%d ", file_stats[i].st_mtim); */
 
         wprintw(file_window, "\n");
