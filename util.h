@@ -16,3 +16,6 @@ char *path_join(const char *current, const char *filename);
 const char *rstrstr(const char *str, const char *substr);
 char *get_parent(const char *dirname);
 bool is_valid_dir(const char *dirname);
+
+void get_human_size(size_t value, char *buffer, size_t n);
+void get_human_time(struct timespec t, char *buffer, size_t n);

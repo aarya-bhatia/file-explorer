@@ -1,7 +1,9 @@
 #include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
+#include <time.h>
 
 size_t num_files(char **vector)
 {
@@ -75,3 +77,24 @@ void vec_free(char **vec)
 
     free(vec);
 }
+
+void get_human_size(size_t value, char *buffer, size_t n)
+{
+    static char *units[] = {"B", "K", "M", "G"};
+    int unit_index = 0;
+    while (value > 1024 && unit_index + 1 < sizeof units / sizeof units[0]) {
+        value = value / 1024;
+        unit_index++;
+    }
+
+    snprintf(buffer, n, "%zu%s", value, units[unit_index]);
+}
+
+void get_human_time(struct timespec t, char *buffer, size_t n)
+{
+    struct tm tm;
+    time_t time = t.tv_sec;
+    gmtime_r(&time, &tm);
+    strftime(buffer, n, "%Y-%m-%d %H:%M:%S", &tm);
+}
+
