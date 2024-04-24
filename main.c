@@ -55,11 +55,30 @@ void display_top()
 
 void display_files()
 {
+    assert(file_vec);
+    assert(file_stats);
+
     werase(file_window);
     wmove(file_window, 0, 0);
 
+    int longest_name = 0;
     for (int i = 0; i < max_files && file_vec[i] != NULL; i++) {
-        wprintw(file_window, "%s\n", file_vec[i]);
+        longest_name = MAX(longest_name, strlen(file_vec[i]));
+    }
+
+    for (int i = 0; i < max_files && file_vec[i] != NULL; i++) {
+        wprintw(file_window, "%s", file_vec[i]);
+
+        // padding
+        for (int j = 0; j < longest_name - strlen(file_vec[i]) + 1; j++) {
+            wprintw(file_window, " ");
+        }
+
+        wprintw(file_window, "%6zu ", file_stats[i].st_size);
+        wprintw(file_window, "%6o ", file_stats[i].st_mode);
+        /* wprintw(file_window, "%d ", file_stats[i].st_mtim); */
+
+        wprintw(file_window, "\n");
     }
 
     wrefresh(file_window);
@@ -138,6 +157,17 @@ int main(int argc, const char *argv[])
 
             vec_free(file_vec);
             file_vec = new_file_vec;
+
+            free(file_stats);
+            int n = num_files(file_vec);
+            file_stats = calloc(n, sizeof *file_stats);
+            char filename[256];
+            for (int i = 0; i < n; i++) {
+                snprintf(filename, sizeof(filename) - 1, "%s/%s", dirname, file_vec[i]);
+                if (stat(filename, &file_stats[i]) < 0) {
+                    log_error("stat failed: %s", file_vec[i]);
+                }
+            }
 
             display_files();
         }
