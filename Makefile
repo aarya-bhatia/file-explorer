@@ -6,10 +6,10 @@ LDFLAGS=-lncurses -lm
 
 all: main test
 
-main: main.o log.o util.o
+main: main.o log.o util.o file.o
 	gcc $^ $(LDFLAGS) -o $@
 
-test: test.o log.o util.o
+test: test.o log.o util.o file.o
 	gcc $^ $(LDFLAGS) -o $@
 
 %.o: %.c

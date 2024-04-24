@@ -3,8 +3,12 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+size_t vec_size(char **vec);
+char **vec_copy(char **dst, char **src);
+void vec_free(char **vec);
 
 size_t num_files(char **vector);
 char **list_files(const char *dirname);

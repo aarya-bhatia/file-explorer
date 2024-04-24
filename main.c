@@ -92,19 +92,6 @@ void display_bottom()
     wrefresh(bottom_window);
 }
 
-void vec_free(char **vec)
-{
-    if (!vec) {
-        return;
-    }
-
-    for (char **itr = vec; *itr != NULL; itr++) {
-        free(*itr);
-    }
-
-    free(vec);
-}
-
 int main(int argc, const char *argv[])
 {
     int logfile = open("stderr.log", O_CREAT | O_APPEND | O_WRONLY, 0640);

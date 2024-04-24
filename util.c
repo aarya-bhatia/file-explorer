@@ -1,13 +1,7 @@
-#include "log.h"
-
-#include <dirent.h>
-#include <fcntl.h>
-#include <ncurses.h>
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <stdbool.h>
 
 size_t num_files(char **vector)
 {
@@ -20,52 +14,6 @@ size_t num_files(char **vector)
     }
 
     return i;
-}
-
-char **list_files(const char *dirname)
-{
-    char **vector = calloc(1, sizeof *vector);
-    size_t capacity = 1;
-    size_t size = 0;
-
-    DIR *dirp = opendir(dirname);
-    if (!dirp) {
-        log_error("opendir");
-        free(vector);
-        return NULL;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dirp)) != NULL) {
-        if (size + 1 >= capacity) {
-            capacity *= 2;
-            vector = realloc(vector, capacity * sizeof *vector);
-        }
-
-        if ((entry->d_type == DT_REG) || (entry->d_type == DT_DIR)) {
-            if (entry->d_name[0] != '.') {
-                vector[size++] = strdup(entry->d_name);
-            }
-        }
-    }
-
-    vector = realloc(vector, (size + 1) * sizeof *vector);
-    vector[size] = NULL;
-
-    closedir(dirp);
-
-    return vector;
-}
-
-char *path_join(const char *current, const char *filename)
-{
-    char *newdir = calloc(1, strlen(current) + strlen(filename) + 2);
-    sprintf(newdir, "%s/%s", current, filename);
-
-    char *resolved = realpath(newdir, NULL);
-    free(newdir);
-
-    return resolved;
 }
 
 const char *rstrstr(const char *str, const char *substr)
@@ -83,18 +31,47 @@ const char *rstrstr(const char *str, const char *substr)
     return s;
 }
 
-char *get_parent(const char *dirname)
+size_t vec_size(char **vec)
 {
-    if (strcmp(dirname, "/") == 0 || !strstr(dirname + 1, "/")) {
-        return strdup("/");
+    if (!vec) {
+        return 0;
     }
 
-    const char *ptr = rstrstr(dirname, "/");
-    return strndup(dirname, ptr - dirname);
+    size_t i;
+    for (i = 0; vec[i] != NULL; i++) {
+    }
+
+    return i;
 }
 
-bool is_valid_dir(const char *dirname)
+char **vec_copy(char **dst, char **src)
 {
-    struct stat s;
-    return stat(dirname, &s) == 0 && S_ISDIR(s.st_mode) && access(dirname, R_OK | X_OK) == 0;
+    assert(src);
+    assert(dst);
+
+    int n_dst = vec_size(dst);
+    for (int i = 0; i < n_dst; i++) {
+        free(dst[i]);
+    }
+
+    int n_src = vec_size(src);
+    dst = realloc(dst, (n_src + 1) * sizeof(*dst));
+    for (int i = 0; i < n_src; i++) {
+        dst[i] = strdup(src[i]);
+    }
+    dst[n_src] = 0;
+    return dst;
+}
+
+void vec_free(char **vec)
+{
+    if (!vec) {
+        return;
+    }
+
+    for (int i = 0; i < vec_size(vec); i++) {
+        free(vec[i]);
+    }
+
+    free(vec);
 }
