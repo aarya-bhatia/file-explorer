@@ -9,37 +9,20 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-struct Window {
-    int start_line;
-    int end_line;
-};
-
 char **file_vec = NULL;
+struct stat *file_stats = NULL;
 char *dirname = NULL;
+int selected = 0;
 int path_changed = 0;
-int y = 0;
 
-struct Window file_window;
-struct Window top_window;
-struct Window bottom_window;
+WINDOW *file_window = NULL;
+WINDOW *top_window = NULL;
+WINDOW *bottom_window = NULL;
 
 const char *username;
 char hostname[100];
 
-int get_last_line()
-{
-    return MIN(file_window.end_line, file_window.start_line + num_files(file_vec) - 1);
-}
-
-int count_window_lines(struct Window w)
-{
-    return w.end_line - w.start_line + 1;
-}
-
-const char *get_selected_file()
-{
-    return file_vec[y - file_window.start_line];
-}
+int max_files;
 
 void change_dir(char *newdir)
 {
@@ -53,29 +36,54 @@ void change_dir(char *newdir)
     dirname = newdir;
     log_debug("cd: %s", dirname);
     path_changed = 1;
-    y = file_window.start_line;
+    selected = 0;
 }
 
 void display_top()
 {
+    werase(top_window);
+    wmove(top_window, 0, 0);
+
     if (strcmp(dirname, "/") == 0) {
-        printw("%s@%s:/%s\n\n", username, hostname, get_selected_file());
+        wprintw(top_window, "%s@%s:/%s\n\n", username, hostname, file_vec[selected]);
     } else {
-        printw("%s@%s:%s/%s\n\n", username, hostname, dirname, get_selected_file());
+        wprintw(top_window, "%s@%s:%s/%s\n\n", username, hostname, dirname, file_vec[selected]);
     }
+
+    wrefresh(top_window);
 }
 
 void display_files()
 {
-    for (int i = 0; i < count_window_lines(file_window) && file_vec[i] != NULL; i++) {
-        move(i + file_window.start_line, 0);
-        printw("%s\n", file_vec[i]);
+    werase(file_window);
+    wmove(file_window, 0, 0);
+
+    for (int i = 0; i < max_files && file_vec[i] != NULL; i++) {
+        wprintw(file_window, "%s\n", file_vec[i]);
     }
+
+    wrefresh(file_window);
 }
 
 void display_bottom()
 {
-    printw("\n[%d/%zu]\n", y - file_window.start_line, num_files(file_vec));
+    werase(bottom_window);
+    wmove(bottom_window, 0, 0);
+    wprintw(bottom_window, "\n[%d/%zu]\n", selected, num_files(file_vec));
+    wrefresh(bottom_window);
+}
+
+void vec_free(char **vec)
+{
+    if (!vec) {
+        return;
+    }
+
+    for (char **itr = vec; *itr != NULL; itr++) {
+        free(*itr);
+    }
+
+    free(vec);
 }
 
 int main(int argc, const char *argv[])
@@ -113,16 +121,12 @@ int main(int argc, const char *argv[])
     noecho();
     keypad(stdscr, TRUE);
 
-    top_window.start_line = 0;
-    top_window.end_line = 1;
+    max_files = MIN(LINES / 2, 20);
+    top_window = newwin(2, COLS, 0, 0);
+    file_window = newwin(max_files, COLS, 2, 0);
+    bottom_window = newwin(2, COLS, 2 + max_files, 0);
 
-    file_window.start_line = top_window.end_line + 1;
-    file_window.end_line = MIN(LINES / 2, 20);
-
-    bottom_window.start_line = file_window.end_line + 2;
-    bottom_window.end_line = bottom_window.start_line + 1;
-
-    y = file_window.start_line;
+    refresh();
 
     // main loop
     while (1) {
@@ -132,47 +136,43 @@ int main(int argc, const char *argv[])
                 break;
             }
 
-            for (char **itr = file_vec; itr != NULL && *itr != NULL; itr++) {
-                free(*itr);
-            }
-
-            if (file_vec) {
-                free(file_vec);
-            }
-
+            vec_free(file_vec);
             file_vec = new_file_vec;
+
+            display_files();
         }
 
-        erase();
-        move(0, 0);
         display_top();
-        display_files();
         display_bottom();
-        move(y, 0);
-        refresh();
+
+        wmove(file_window, selected, 0);
+        wrefresh(file_window);
 
         int ch = getch();
         if (ch == 'q') {
             break;
         } else if (ch == KEY_DOWN || ch == 'j') {
-            if (y < get_last_line()) {
-                y++;
+            if (selected + 1 < MIN(max_files, num_files(file_vec))) {
+                selected++;
             }
         } else if (ch == KEY_UP || ch == 'k') {
-            if (y > file_window.start_line) {
-                y--;
+            if (selected > 0) {
+                selected--;
             }
         } else if (ch == '\n' || ch == 'l') {
-            change_dir(path_join(dirname, get_selected_file()));
+            change_dir(path_join(dirname, file_vec[selected]));
         } else if (ch == 'h' || ch == '-') {
             change_dir(get_parent(dirname));
         } else if (ch == 'g') {
-            y = file_window.start_line;
+            selected = 0;
         } else if (ch == 'G') {
-            y = get_last_line();
+            selected = MAX(0, MIN(max_files, num_files(file_vec)) - 1);
         }
     }
 
+    delwin(top_window);
+    delwin(file_window);
+    delwin(bottom_window);
     endwin();
     return 0;
 }
