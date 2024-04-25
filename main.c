@@ -12,6 +12,7 @@
 char **file_vec = NULL;
 struct stat *file_stats = NULL;
 char *dirname = NULL;
+int num_files = 0;
 int selected = 0;
 int path_changed = 0;
 
@@ -95,7 +96,7 @@ void display_bottom()
 {
     werase(bottom_window);
     wmove(bottom_window, 0, 0);
-    wprintw(bottom_window, "\n[%d/%zu]\n", selected, num_files(file_vec));
+    wprintw(bottom_window, "\n[%d/%d]\n", selected, num_files);
     wrefresh(bottom_window);
 }
 
@@ -152,11 +153,12 @@ int main(int argc, const char *argv[])
             vec_free(file_vec);
             file_vec = new_file_vec;
 
+            num_files = vec_size(file_vec);
+
             free(file_stats);
-            int n = num_files(file_vec);
-            file_stats = calloc(n, sizeof *file_stats);
+            file_stats = calloc(num_files, sizeof *file_stats);
             char filename[256];
-            for (int i = 0; i < n; i++) {
+            for (int i = 0; i < num_files; i++) {
                 snprintf(filename, sizeof(filename) - 1, "%s/%s", dirname, file_vec[i]);
                 if (stat(filename, &file_stats[i]) < 0) {
                     log_error("stat failed: %s", file_vec[i]);
@@ -176,7 +178,7 @@ int main(int argc, const char *argv[])
         if (ch == 'q') {
             break;
         } else if (ch == KEY_DOWN || ch == 'j') {
-            if (selected + 1 < MIN(max_files, num_files(file_vec))) {
+            if (selected + 1 < MIN(max_files, num_files)) {
                 selected++;
             }
         } else if (ch == KEY_UP || ch == 'k') {
@@ -190,7 +192,7 @@ int main(int argc, const char *argv[])
         } else if (ch == 'g') {
             selected = 0;
         } else if (ch == 'G') {
-            selected = MAX(0, MIN(max_files, num_files(file_vec)) - 1);
+            selected = MAX(0, MIN(max_files, num_files) - 1);
         }
     }
 

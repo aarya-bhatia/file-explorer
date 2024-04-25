@@ -6,19 +6,6 @@
 #include <sys/stat.h>
 #include <time.h>
 
-size_t num_files(char **vector)
-{
-    if (!vector) {
-        return 0;
-    }
-
-    size_t i;
-    for (i = 0; vector[i] != NULL; i++) {
-    }
-
-    return i;
-}
-
 const char *rstrstr(const char *str, const char *substr)
 {
     char *s = strstr(str, substr);
