@@ -16,6 +16,10 @@ int num_files = 0;
 int selected = 0;
 int path_changed = 0;
 
+enum { NORMAL_MODE, FIND_MODE } ui_mode = 0;
+
+char status_message[512];
+
 WINDOW *file_window = NULL;
 WINDOW *top_window = NULL;
 WINDOW *bottom_window = NULL;
@@ -96,7 +100,11 @@ void display_bottom()
 {
     werase(bottom_window);
     wmove(bottom_window, 0, 0);
-    wprintw(bottom_window, "\n[%d/%d]\n", selected, num_files);
+    wprintw(bottom_window, "\n[%d/%d]", selected, num_files);
+    if (strlen(status_message) > 0) {
+        wprintw(bottom_window, "\t\t%s", status_message);
+    }
+    wprintw(bottom_window, "\n");
     wrefresh(bottom_window);
 }
 
@@ -175,24 +183,41 @@ int main(int argc, const char *argv[])
         wrefresh(file_window);
 
         int ch = getch();
-        if (ch == 'q') {
-            break;
-        } else if (ch == KEY_DOWN || ch == 'j') {
-            if (selected + 1 < MIN(max_files, num_files)) {
-                selected++;
+
+        if (ui_mode == FIND_MODE) {
+            ui_mode = NORMAL_MODE;
+            status_message[0] = 0;
+
+            for (int i = selected + 1; i < MIN(max_files, num_files); i++) {
+                if (*file_vec[i] == ch) {
+                    selected = i;
+                    break;
+                }
             }
-        } else if (ch == KEY_UP || ch == 'k') {
-            if (selected > 0) {
-                selected--;
+
+        } else {
+            if (ch == 'q') {
+                break;
+            } else if (ch == KEY_DOWN || ch == 'j') {
+                if (selected + 1 < MIN(max_files, num_files)) {
+                    selected++;
+                }
+            } else if (ch == KEY_UP || ch == 'k') {
+                if (selected > 0) {
+                    selected--;
+                }
+            } else if (ch == '\n' || ch == 'l') {
+                change_dir(path_join(dirname, file_vec[selected]));
+            } else if (ch == 'h' || ch == '-') {
+                change_dir(get_parent(dirname));
+            } else if (ch == 'g') {
+                selected = 0;
+            } else if (ch == 'G') {
+                selected = MAX(0, MIN(max_files, num_files) - 1);
+            } else if (ch == 'f') {
+                sprintf(status_message, "f");
+                ui_mode = FIND_MODE;
             }
-        } else if (ch == '\n' || ch == 'l') {
-            change_dir(path_join(dirname, file_vec[selected]));
-        } else if (ch == 'h' || ch == '-') {
-            change_dir(get_parent(dirname));
-        } else if (ch == 'g') {
-            selected = 0;
-        } else if (ch == 'G') {
-            selected = MAX(0, MIN(max_files, num_files) - 1);
         }
     }
 
