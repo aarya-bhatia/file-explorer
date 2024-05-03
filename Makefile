@@ -1,25 +1,31 @@
-OBJDIR=.
-BINDIR=.
-SRCDIR=.
 CFLAGS=-c -std=c99 -Wall -pedantic -g -D_GNU_SOURCE
 LDFLAGS=-lncurses -lm
 
-all: main test
+MAIN_SRC=src/main.c src/log.c src/util.c src/file.c
+TEST_SRC=src/test.c src/log.c src/util.c src/file.c
 
-main: main.o log.o util.o file.o
+MAIN_OBJ=$(MAIN_SRC:src/%.c=obj/%.o)
+TEST_OBJ=$(TEST_SRC:src/%.c=obj/%.o)
+
+all: bin/main bin/test
+
+bin/main: $(MAIN_OBJ)
+	mkdir -p bin
 	gcc $^ $(LDFLAGS) -o $@
 
-test: test.o log.o util.o file.o
+bin/test: $(TEST_OBJ)
+	mkdir -p bin
 	gcc $^ $(LDFLAGS) -o $@
 
-%.o: %.c
+obj/%.o: src/%.c
+	mkdir -p obj
 	gcc $(CFLAGS) $< -o $@
 
 clean:
-	/bin/rm -rf *.o *.d test main vgcore* *.log *.exe
+	rm -rf obj/ bin/ vgcore* *.log
 
 tags:
-	ctags -R *
+	ctags -R src
 
 .PHONY: clean tags
 
