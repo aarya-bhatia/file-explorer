@@ -1,3 +1,4 @@
+#include "file.h"
 #include "util.h"
 #include <assert.h>
 #include <stdio.h>
@@ -5,7 +6,35 @@
 #include <string.h>
 #include <time.h>
 
-int main()
+void test_files()
+{
+    UI *ui = calloc(1, sizeof *ui);
+    set_directory(ui, strdup("/home/aarya"));
+    assert(ui->files);
+    assert(ui->selected);
+    assert(!strcmp(ui->dirname, "/home/aarya"));
+    assert(ui->scroll == 0);
+    assert(ui->selected == ui->files);
+
+    ui->scroll++;
+
+    set_directory(ui, strdup("/home/aarya/scripts"));
+
+    int n = get_num_files(ui);
+    ui->max_files = n / 2;
+
+    File *f1 = get_top_file(ui);
+    File *f2 = get_bottom_file(ui);
+    assert(distance(f1, f2) == ui->max_files);
+    assert(num_files_displayed(ui) == ui->max_files);
+    assert(get_file_index(ui, f1) == ui->scroll);
+    assert(get_file_index(ui, f2) == ui->scroll + ui->max_files - 1);
+
+    free_file_list(ui);
+    free(ui);
+}
+
+void test_util()
 {
     char **vector = list_files("/");
     for (char **itr = vector; *itr != NULL; itr++) {
@@ -60,6 +89,9 @@ int main()
 
     get_perm_string(0755, buffer, sizeof buffer - 1);
     puts(buffer);
+}
 
-    return 0;
+int main()
+{
+    test_files();
 }

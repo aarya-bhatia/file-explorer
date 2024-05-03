@@ -1,148 +1,169 @@
-#include "log.h"
-#include "util.h"
-#include <assert.h>
-#include <fcntl.h>
+#include "file.h"
 #include <ncurses.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 void change_dir(char *);
 void display_top();
 void display_files();
 void display_bottom();
 
-char **file_vec = NULL;
-struct stat *file_stats = NULL;
-char *dirname = NULL;
-int num_files = 0;
-int selected = 0;
-int scroll_offset = 0;
-int path_changed = 0;
-
-enum { NORMAL_MODE, FIND_MODE } ui_mode = 0;
-
-char status_message[512];
+UI *ui = NULL;
 
 WINDOW *file_window = NULL;
 WINDOW *top_window = NULL;
 WINDOW *bottom_window = NULL;
 
+char status_message[512];
 const char *username;
 char hostname[100];
-
-int max_files;
 
 /* Select next file in view */
 void handle_down_key()
 {
-    // check if bottom-most file is in view
-    if (selected - scroll_offset + 1 < MIN(max_files, num_files)) {
-        selected++;
+    if (!ui->selected) {
+        return;
+    }
+
+    if (ui->selected->next && ui->selected != get_bottom_file(ui)) {
+        ui->selected = ui->selected->next;
     }
 }
 
 /* Select prev file in view */
 void handle_up_key()
 {
-    if (selected > 0) {
-        selected--;
+    if (!ui->selected) {
+        return;
+    }
+
+    if (ui->selected->prev && ui->selected != get_top_file(ui)) {
+        ui->selected = ui->selected->prev;
     }
 }
 
-/* If directory is selected, move into directory
- * TODO: If file is selected, perform file preview action */
+/* move into selected directory or perform file action */
 void handle_right_key()
 {
-    change_dir(path_join(dirname, file_vec[selected]));
+    if (!ui->selected) {
+        return;
+    }
+
+    change_dir(path_join(ui->dirname, ui->selected->name));
 }
 
 /* Move to parent directory */
 void handle_left_key()
 {
-    change_dir(get_parent(dirname));
+    change_dir(get_parent(ui->dirname));
 }
 
 /* Scroll file view down */
 void handle_scroll_down()
 {
-    if (num_files - scroll_offset > max_files) {
-        scroll_offset++;
-        selected = MAX(selected, scroll_offset);
+    if (!ui->files) {
+        return;
+    }
+
+    if (num_files_displayed(ui) >= ui->max_files) {
+        ui->scroll++;
+
+        if (!is_displayed(ui, ui->selected)) {
+            ui->selected = get_file_at_index(ui, ui->scroll);
+        }
     }
 }
 
 /* Scroll file view up */
 void handle_scroll_up()
 {
-    if (scroll_offset > 0) {
-        scroll_offset--;
-        selected = MIN(selected, scroll_offset);
+    if (!ui->files) {
+        return;
+    }
+
+    if (ui->scroll > 0) {
+        ui->scroll = 0;
+
+        if (!is_displayed(ui, ui->selected)) {
+            ui->selected = get_file_at_index(ui, ui->scroll);
+        }
     }
 }
 
 /* select top most file in the view */
 void handle_goto_top()
 {
-    selected = scroll_offset;
+    if (!ui->files) {
+        return;
+    }
+    ui->selected = get_top_file(ui);
 }
 
 /* select bottom most file in the view */
 void handle_goto_bottom()
 {
-    if (num_files > 0) {
-        selected = MIN(scroll_offset + max_files, num_files) - 1;
+    if (!ui->files) {
+        return;
     }
+    ui->selected = get_bottom_file(ui);
 }
 
 /* start find mode */
 void handle_start_find()
 {
+    if (!ui->files) {
+        return;
+    }
     sprintf(status_message, "f");
-    ui_mode = FIND_MODE;
+    ui->mode = FIND_MODE;
 }
 
 /* find file with char prefix and exit find mode */
 void handle_find_key(char ch)
 {
-    ui_mode = NORMAL_MODE;
+    ui->mode = NORMAL_MODE;
     status_message[0] = 0;
 
-    for (int i = selected + 1; i < MIN(scroll_offset + max_files, num_files); i++) {
-        if (*file_vec[i] == ch) {
-            selected = i;
+    File *A = get_top_file(ui);
+    File *B = get_bottom_file(ui);
+
+    while (A && B && A != B->next) {
+        if (A->name[0] == ch) {
+            ui->selected = A;
             break;
         }
+
+        A = A->next;
     }
 }
 
 void change_dir(char *newdir)
 {
-    if (!(newdir && strcmp(dirname, newdir) != 0 && is_valid_dir(newdir))) {
-        log_error("cd failed: %s", newdir);
-        free(newdir);
+    assert(newdir);
+
+    // directory unchanged
+    if (strcmp(ui->dirname, newdir) == 0) {
         return;
     }
 
-    free(dirname);
-    dirname = newdir;
-    log_debug("cd: %s", dirname);
-    path_changed = 1;
-    selected = 0;
-    scroll_offset = 0;
+    if (is_valid_dir(newdir)) {
+        set_directory(ui, newdir);
+        log_debug("cd: %s", ui->dirname);
+    } else {
+        log_error("cd failed: %s", newdir);
+        free(newdir);
+    }
 }
 
 void display_top()
 {
+    assert(ui->dirname);
+
     werase(top_window);
     wmove(top_window, 0, 0);
 
-    if (strcmp(dirname, "/") == 0) {
-        wprintw(top_window, "%s@%s:/%s\n\n", username, hostname, file_vec[selected]);
+    if (strcmp(ui->dirname, "/") == 0) {
+        wprintw(top_window, "%s@%s:/%s\n\n", username, hostname, ui->dirname);
     } else {
-        wprintw(top_window, "%s@%s:%s/%s\n\n", username, hostname, dirname, file_vec[selected]);
+        wprintw(top_window, "%s@%s:%s\n\n", username, hostname, ui->dirname);
     }
 
     wrefresh(top_window);
@@ -150,38 +171,47 @@ void display_top()
 
 void display_files()
 {
-    assert(file_vec);
-    assert(file_stats);
+    assert(ui->dirname);
+    log_debug("display_files");
 
     werase(file_window);
     wmove(file_window, 0, 0);
 
+    if (!ui->selected) {
+        wrefresh(file_window);
+        return;
+    }
+
     int longest_name = 0;
-    for (int i = scroll_offset; i < scroll_offset + max_files && file_vec[i] != NULL; i++) {
-        longest_name = MAX(longest_name, strlen(file_vec[i]));
+
+    for (File *f = ui->files; f; f = f->next) {
+        longest_name = MAX(longest_name, strlen(f->name));
     }
 
     char buffer[256];
 
-    for (int i = scroll_offset; i < scroll_offset + max_files && file_vec[i] != NULL; i++) {
-        if (selected == i) {
-            wprintw(file_window, "> %s", file_vec[i]);
+    log_debug("top file: %s", get_top_file(ui)->name);
+    log_debug("bottom file: %s", get_bottom_file(ui)->name);
+
+    for (File *f = get_top_file(ui); f && f != get_bottom_file(ui)->next; f = f->next) {
+        if (ui->selected == f) {
+            wprintw(file_window, "> %s", f->name);
         } else {
-            wprintw(file_window, "  %s", file_vec[i]);
+            wprintw(file_window, "  %s", f->name);
         }
 
         // padding
-        for (int j = 0; j < longest_name - strlen(file_vec[i]) + 1; j++) {
+        for (int j = 0; j < longest_name - strlen(f->name) + 1; j++) {
             wprintw(file_window, " ");
         }
 
-        get_human_size(file_stats[i].st_size, buffer, sizeof buffer - 1);
+        get_human_size(f->stat.st_size, buffer, sizeof buffer - 1);
         wprintw(file_window, "%-6s", buffer);
 
-        get_human_time(file_stats[i].st_mtim, buffer, sizeof buffer - 1);
+        get_human_time(f->stat.st_mtim, buffer, sizeof buffer - 1);
         wprintw(file_window, "%-20s", buffer);
 
-        get_perm_string(file_stats[i].st_mode, buffer, sizeof buffer - 1);
+        get_perm_string(f->stat.st_mode, buffer, sizeof buffer - 1);
         wprintw(file_window, "%-16s", buffer);
 
         wprintw(file_window, "\n");
@@ -192,12 +222,19 @@ void display_files()
 
 void display_bottom()
 {
+    assert(ui->dirname);
+
     werase(bottom_window);
     wmove(bottom_window, 0, 0);
-    wprintw(bottom_window, "\n[%d/%d]", selected, num_files);
+
+    if (ui->selected) {
+        wprintw(bottom_window, "\n[%d/%d]", get_file_index(ui, ui->selected), get_num_files(ui));
+    }
+
     if (strlen(status_message) > 0) {
         wprintw(bottom_window, "\t\t%s", status_message);
     }
+
     wprintw(bottom_window, "\n");
     wrefresh(bottom_window);
 }
@@ -217,6 +254,8 @@ int main(int argc, const char *argv[])
     dup2(logfile, 2);
     close(logfile);
 
+    ui = calloc(1, sizeof *ui);
+
     if (argc < 2) {
         const char *home_path = getenv("HOME");
         if (!home_path) {
@@ -224,17 +263,19 @@ int main(int argc, const char *argv[])
             return 1;
         }
 
-        dirname = strdup(home_path);
+        set_directory(ui, strdup(home_path));
 
     } else {
-        const char *start_path = argv[1];
-        if (!(dirname = realpath(start_path, NULL))) {
+        char *dirname = realpath(argv[1], NULL);
+        if (!dirname) {
             log_error("realpath");
             return 1;
         }
+
+        set_directory(ui, dirname);
     }
 
-    log_debug("current directory: %s", dirname);
+    log_debug("current directory: %s", ui->dirname);
 
     gethostname(hostname, sizeof hostname - 1);
 
@@ -247,46 +288,24 @@ int main(int argc, const char *argv[])
     keypad(stdscr, TRUE);
     curs_set(0);
 
-    max_files = MIN(LINES / 2, 20);
+    ui->max_files = MIN(LINES / 2, 10);
     top_window = newwin(2, COLS, 0, 0);
-    file_window = newwin(max_files, COLS, 2, 0);
-    bottom_window = newwin(2, COLS, 2 + max_files, 0);
+    file_window = newwin(ui->max_files, COLS, 2, 0);
+    bottom_window = newwin(2, COLS, 2 + ui->max_files, 0);
 
-    log_debug("max files: %d", max_files);
+    log_debug("max files: %d", ui->max_files);
 
     refresh();
 
     // main loop
     while (1) {
-        if (!file_vec || path_changed) {
-            char **new_file_vec = list_files(dirname);
-            if (new_file_vec == NULL) {
-                break;
-            }
-
-            vec_free(file_vec);
-            file_vec = new_file_vec;
-
-            num_files = vec_size(file_vec);
-
-            free(file_stats);
-            file_stats = calloc(num_files, sizeof *file_stats);
-            char filename[256];
-            for (int i = 0; i < num_files; i++) {
-                snprintf(filename, sizeof(filename) - 1, "%s/%s", dirname, file_vec[i]);
-                if (stat(filename, &file_stats[i]) < 0) {
-                    log_error("stat failed: %s", file_vec[i]);
-                }
-            }
-        }
-
         display_top();
         display_bottom();
         display_files();
 
         int ch = getch();
 
-        switch (ui_mode) {
+        switch (ui->mode) {
             case NORMAL_MODE:
 
                 switch (ch) {
