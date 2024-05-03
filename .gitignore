@@ -6,5 +6,4 @@ obj
 *.out
 *.log
 vgcore*
-main
-test
+tags
