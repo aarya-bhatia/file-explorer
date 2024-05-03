@@ -9,11 +9,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+void change_dir(char *);
+void display_top();
+void display_files();
+void display_bottom();
+
 char **file_vec = NULL;
 struct stat *file_stats = NULL;
 char *dirname = NULL;
 int num_files = 0;
 int selected = 0;
+int scroll_offset = 0;
 int path_changed = 0;
 
 enum { NORMAL_MODE, FIND_MODE } ui_mode = 0;
@@ -29,6 +35,87 @@ char hostname[100];
 
 int max_files;
 
+/* Select next file in view */
+void handle_down_key()
+{
+    // check if bottom-most file is in view
+    if (selected - scroll_offset + 1 < MIN(max_files, num_files)) {
+        selected++;
+    }
+}
+
+/* Select prev file in view */
+void handle_up_key()
+{
+    if (selected > 0) {
+        selected--;
+    }
+}
+
+/* If directory is selected, move into directory
+ * TODO: If file is selected, perform file preview action */
+void handle_right_key()
+{
+    change_dir(path_join(dirname, file_vec[selected]));
+}
+
+/* Move to parent directory */
+void handle_left_key()
+{
+    change_dir(get_parent(dirname));
+}
+
+/* Scroll file view down */
+void handle_scroll_down()
+{
+    if (num_files - scroll_offset > max_files) {
+        scroll_offset++;
+        selected = MAX(selected, scroll_offset);
+    }
+}
+
+/* Scroll file view up */
+void handle_scroll_up()
+{
+    if (scroll_offset > 0) {
+        scroll_offset--;
+        selected = MIN(selected, scroll_offset);
+    }
+}
+
+/* select top most file in the view */
+void handle_goto_top()
+{
+    selected = scroll_offset;
+}
+
+/* select bottom most file in the view */
+void handle_goto_bottom()
+{
+    if (num_files > 0) {
+        selected = MIN(scroll_offset + max_files, num_files) - 1;
+    }
+}
+
+void handle_start_find()
+{
+    sprintf(status_message, "f");
+    ui_mode = FIND_MODE;
+}
+
+void handle_find_key(char ch)
+{
+    ui_mode = NORMAL_MODE;
+    status_message[0] = 0;
+
+    for (int i = selected + 1; i < MIN(max_files, num_files); i++) {
+        if (*file_vec[i] == ch) {
+            selected = i;
+            break;
+        }
+    }
+}
+
 void change_dir(char *newdir)
 {
     if (!(newdir && strcmp(dirname, newdir) != 0 && is_valid_dir(newdir))) {
@@ -42,6 +129,7 @@ void change_dir(char *newdir)
     log_debug("cd: %s", dirname);
     path_changed = 1;
     selected = 0;
+    scroll_offset = 0;
 }
 
 void display_top()
@@ -67,13 +155,13 @@ void display_files()
     wmove(file_window, 0, 0);
 
     int longest_name = 0;
-    for (int i = 0; i < max_files && file_vec[i] != NULL; i++) {
+    for (int i = scroll_offset; i < scroll_offset + max_files && file_vec[i] != NULL; i++) {
         longest_name = MAX(longest_name, strlen(file_vec[i]));
     }
 
     char buffer[256];
 
-    for (int i = 0; i < max_files && file_vec[i] != NULL; i++) {
+    for (int i = scroll_offset; i < scroll_offset + max_files && file_vec[i] != NULL; i++) {
         if (selected == i) {
             wprintw(file_window, "> %s", file_vec[i]);
         } else {
@@ -110,6 +198,15 @@ void display_bottom()
     }
     wprintw(bottom_window, "\n");
     wrefresh(bottom_window);
+}
+
+void quit(int exit_code)
+{
+    delwin(top_window);
+    delwin(file_window);
+    delwin(bottom_window);
+    endwin();
+    exit(exit_code);
 }
 
 int main(int argc, const char *argv[])
@@ -153,6 +250,8 @@ int main(int argc, const char *argv[])
     file_window = newwin(max_files, COLS, 2, 0);
     bottom_window = newwin(2, COLS, 2 + max_files, 0);
 
+    log_debug("max files: %d", max_files);
+
     refresh();
 
     // main loop
@@ -185,46 +284,61 @@ int main(int argc, const char *argv[])
 
         int ch = getch();
 
-        if (ui_mode == FIND_MODE) {
-            ui_mode = NORMAL_MODE;
-            status_message[0] = 0;
+        switch (ui_mode) {
+            case NORMAL_MODE:
 
-            for (int i = selected + 1; i < MIN(max_files, num_files); i++) {
-                if (*file_vec[i] == ch) {
-                    selected = i;
-                    break;
+                switch (ch) {
+                    case 'q':
+                        quit(0);
+                        break;
+
+                    case 'j':
+                    case KEY_DOWN:
+                        handle_down_key();
+                        break;
+
+                    case 'k':
+                    case KEY_UP:
+                        handle_up_key();
+                        break;
+
+                    case '\n':
+                    case 'l':
+                        handle_right_key();
+                        break;
+
+                    case 'h':
+                    case '-':
+                        handle_left_key();
+                        break;
+
+                    case 'g':
+                        handle_goto_top();
+                        break;
+
+                    case 'G':
+                        handle_goto_bottom();
+                        break;
+
+                    case 'f':
+                        handle_start_find();
+                        break;
+
+                    case 'J':
+                        handle_scroll_down();
+                        break;
+
+                    case 'K':
+                        handle_scroll_up();
+                        break;
                 }
-            }
 
-        } else {
-            if (ch == 'q') {
                 break;
-            } else if (ch == KEY_DOWN || ch == 'j') {
-                if (selected + 1 < MIN(max_files, num_files)) {
-                    selected++;
-                }
-            } else if (ch == KEY_UP || ch == 'k') {
-                if (selected > 0) {
-                    selected--;
-                }
-            } else if (ch == '\n' || ch == 'l') {
-                change_dir(path_join(dirname, file_vec[selected]));
-            } else if (ch == 'h' || ch == '-') {
-                change_dir(get_parent(dirname));
-            } else if (ch == 'g') {
-                selected = 0;
-            } else if (ch == 'G') {
-                selected = MAX(0, MIN(max_files, num_files) - 1);
-            } else if (ch == 'f') {
-                sprintf(status_message, "f");
-                ui_mode = FIND_MODE;
-            }
+            case FIND_MODE:
+                handle_find_key(ch);
+                break;
         }
     }
 
-    delwin(top_window);
-    delwin(file_window);
-    delwin(bottom_window);
-    endwin();
-    return 0;
+    quit(0);
 }
