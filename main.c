@@ -74,7 +74,11 @@ void display_files()
     char buffer[256];
 
     for (int i = 0; i < max_files && file_vec[i] != NULL; i++) {
-        wprintw(file_window, "%s", file_vec[i]);
+        if (selected == i) {
+            wprintw(file_window, "> %s", file_vec[i]);
+        } else {
+            wprintw(file_window, "  %s", file_vec[i]);
+        }
 
         // padding
         for (int j = 0; j < longest_name - strlen(file_vec[i]) + 1; j++) {
@@ -142,6 +146,7 @@ int main(int argc, const char *argv[])
     raw();
     noecho();
     keypad(stdscr, TRUE);
+    curs_set(0);
 
     max_files = MIN(LINES / 2, 20);
     top_window = newwin(2, COLS, 0, 0);
@@ -172,15 +177,11 @@ int main(int argc, const char *argv[])
                     log_error("stat failed: %s", file_vec[i]);
                 }
             }
-
-            display_files();
         }
 
         display_top();
         display_bottom();
-
-        wmove(file_window, selected, 0);
-        wrefresh(file_window);
+        display_files();
 
         int ch = getch();
 
