@@ -24,6 +24,7 @@ typedef struct UI {
     int scroll;
     char *dirname;
     int max_files;
+    int max_width;
 } UI;
 
 bool is_displayed(UI *ui, File *f);

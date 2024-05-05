@@ -1,10 +1,22 @@
 #include "file.h"
 #include <ncurses.h>
 
+#define UI_MAX_PATH_LENGTH 30
+
+void quit(int);
 void change_dir(char *);
 void display_top();
 void display_files();
 void display_bottom();
+
+void handle_up_key();
+void handle_down_key();
+void handle_left_key();
+void handle_right_key();
+void handle_scroll_down();
+void handle_scroll_up();
+void handle_start_find();
+void handle_find_key(char);
 
 UI *ui = NULL;
 
@@ -19,25 +31,29 @@ char hostname[100];
 /* Select next file in view */
 void handle_down_key()
 {
-    if (!ui->selected) {
+    if (!ui->selected || !ui->selected->next) {
         return;
     }
 
-    if (ui->selected->next && ui->selected != get_bottom_file(ui)) {
-        ui->selected = ui->selected->next;
+    if (ui->selected == get_bottom_file(ui)) {
+        handle_scroll_down();
     }
+
+    ui->selected = ui->selected->next;
 }
 
 /* Select prev file in view */
 void handle_up_key()
 {
-    if (!ui->selected) {
+    if (!ui->selected || !ui->selected->prev) {
         return;
     }
 
-    if (ui->selected->prev && ui->selected != get_top_file(ui)) {
-        ui->selected = ui->selected->prev;
+    if (ui->selected == get_top_file(ui)) {
+        handle_scroll_up();
     }
+
+    ui->selected = ui->selected->prev;
 }
 
 /* move into selected directory or perform file action */
@@ -182,11 +198,13 @@ void display_files()
         return;
     }
 
-    int longest_name = 0;
+    int max_name_width = 0;
 
     for (File *f = ui->files; f; f = f->next) {
-        longest_name = MAX(longest_name, strlen(f->name));
+        max_name_width = MAX(max_name_width, strlen(f->name));
     }
+
+    max_name_width = MIN(max_name_width, UI_MAX_PATH_LENGTH);
 
     char buffer[256];
 
@@ -194,14 +212,17 @@ void display_files()
     log_debug("bottom file: %s", get_bottom_file(ui)->name);
 
     for (File *f = get_top_file(ui); f && f != get_bottom_file(ui)->next; f = f->next) {
+        snprintf(buffer, UI_MAX_PATH_LENGTH, "%s", f->name);
+        size_t name_width = strlen(buffer);
+
         if (ui->selected == f) {
-            wprintw(file_window, "> %s", f->name);
+            wprintw(file_window, "> %s", buffer);
         } else {
-            wprintw(file_window, "  %s", f->name);
+            wprintw(file_window, "  %s", buffer);
         }
 
         // padding
-        for (int j = 0; j < longest_name - strlen(f->name) + 1; j++) {
+        for (int j = 0; j < max_name_width - name_width + 1; j++) {
             wprintw(file_window, " ");
         }
 
@@ -288,6 +309,7 @@ int main(int argc, const char *argv[])
     keypad(stdscr, TRUE);
     curs_set(0);
 
+    ui->max_width = COLS;
     ui->max_files = MIN(LINES / 2, 10);
     top_window = newwin(2, COLS, 0, 0);
     file_window = newwin(ui->max_files, COLS, 2, 0);
@@ -355,6 +377,7 @@ int main(int argc, const char *argv[])
                 }
 
                 break;
+
             case FIND_MODE:
                 handle_find_key(ch);
                 break;
