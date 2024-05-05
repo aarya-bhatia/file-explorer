@@ -1,7 +1,10 @@
 #include "file.h"
 #include <ncurses.h>
+#include <sys/stat.h>
 
 #define UI_MAX_PATH_LENGTH 30
+
+enum { COLOR_PAIR_NORMAL = 1, COLOR_PAIR_DIRECTORY, COLOR_PAIR_SYMLINK };
 
 void quit(int);
 void change_dir(char *);
@@ -96,7 +99,7 @@ void handle_scroll_up()
     }
 
     if (ui->scroll > 0) {
-        ui->scroll = 0;
+        ui->scroll--;
 
         if (!is_displayed(ui, ui->selected)) {
             ui->selected = get_file_at_index(ui, ui->scroll);
@@ -209,18 +212,31 @@ void display_files()
 
     char buffer[256];
 
-    log_debug("top file: %s", get_top_file(ui)->name);
-    log_debug("bottom file: %s", get_bottom_file(ui)->name);
+    /* log_debug("top file: %s", get_top_file(ui)->name); */
+    /* log_debug("bottom file: %s", get_bottom_file(ui)->name); */
 
     for (File *f = get_top_file(ui); f && f != get_bottom_file(ui)->next; f = f->next) {
         snprintf(buffer, UI_MAX_PATH_LENGTH, "%s", f->name);
         size_t name_width = strlen(buffer);
 
+        if (f->name[0] == '.') {
+        } else if (S_ISLNK(f->stat.st_mode)) {
+            wattron(file_window, COLOR_PAIR(COLOR_PAIR_SYMLINK));
+        } else if (S_ISDIR(f->stat.st_mode)) {
+            wattron(file_window, COLOR_PAIR(COLOR_PAIR_DIRECTORY));
+        } else {
+            wattron(file_window, COLOR_PAIR(COLOR_PAIR_NORMAL));
+        }
+
         if (ui->selected == f) {
+            wattron(file_window, A_BOLD);
             wprintw(file_window, "> %s", buffer);
+            wattroff(file_window, A_BOLD);
         } else {
             wprintw(file_window, "  %s", buffer);
         }
+
+        wattron(file_window, COLOR_PAIR(COLOR_PAIR_NORMAL));
 
         // padding
         for (int j = 0; j < max_name_width - name_width + 1; j++) {
@@ -310,6 +326,12 @@ int main(int argc, const char *argv[])
     keypad(stdscr, TRUE);
     curs_set(0);
 
+    if (!has_colors()) {
+        endwin();
+        printf("Your terminal does not support color\n");
+        exit(1);
+    }
+
     ui->max_width = COLS;
     ui->max_files = MIN(LINES / 2, 10);
     top_window = newwin(2, COLS, 0, 0);
@@ -317,6 +339,15 @@ int main(int argc, const char *argv[])
     bottom_window = newwin(2, COLS, 2 + ui->max_files, 0);
 
     log_debug("max files: %d", ui->max_files);
+
+    clear();
+
+    start_color();
+
+    /* index, foreground, background */
+    init_pair(COLOR_PAIR_NORMAL, COLOR_WHITE, COLOR_BLACK);
+    init_pair(COLOR_PAIR_DIRECTORY, COLOR_BLUE, COLOR_BLACK);
+    init_pair(COLOR_PAIR_SYMLINK, COLOR_YELLOW, COLOR_BLACK);
 
     refresh();
 

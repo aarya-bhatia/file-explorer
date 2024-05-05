@@ -1,5 +1,6 @@
 #include "file.h"
 #include <dirent.h>
+#include <sys/stat.h>
 
 File *get_file_at_index(UI *ui, int index)
 {
@@ -95,16 +96,34 @@ void refresh_file_list(UI *ui)
     char **file_vec = list_files(ui->dirname);
     assert(file_vec);
 
+    int ndir = 0;
+    int nlnk = 0;
+
     for (int i = 0; file_vec[i]; i++) {
         File *node = calloc(1, sizeof *node);
         node->name = file_vec[i];
         char filename[256];
         snprintf(filename, sizeof(filename) - 1, "%s/%s", ui->dirname, file_vec[i]);
-        if (stat(filename, &node->stat) < 0) {
+
+        if (lstat(filename, &node->stat) < 0) {
             log_error("stat failed: %s", file_vec[i]);
+            free(file_vec[i]);
+            free(node);
+            continue;
         }
+
+        if (S_ISDIR(node->stat.st_mode)) {
+            ndir++;
+        } else if (S_ISLNK(node->stat.st_mode)) {
+            nlnk++;
+        }
+
         add_file(ui, node);
     }
+
+    free(file_vec);
+
+    log_debug("total dirs: %d, links: %d", ndir, nlnk);
 }
 
 void add_file(UI *ui, File *file)
@@ -144,10 +163,8 @@ char **list_files(const char *dirname)
             vector = realloc(vector, capacity * sizeof *vector);
         }
 
-        if ((entry->d_type == DT_REG) || (entry->d_type == DT_DIR)) {
-            if (entry->d_name[0] != '.') {
-                vector[size++] = strdup(entry->d_name);
-            }
+        if (entry->d_name[0] != '.') {
+            vector[size++] = strdup(entry->d_name);
         }
     }
 
