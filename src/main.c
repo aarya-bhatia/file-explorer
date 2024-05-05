@@ -2,6 +2,7 @@
 #include <ncurses.h>
 #include <sys/stat.h>
 
+#define UI_MAX_LINES 50
 #define UI_MAX_PATH_LENGTH 30
 
 enum { COLOR_PAIR_NORMAL = 1, COLOR_PAIR_DIRECTORY, COLOR_PAIR_SYMLINK };
@@ -333,7 +334,7 @@ int main(int argc, const char *argv[])
     }
 
     ui->max_width = COLS;
-    ui->max_files = MIN(LINES / 2, 10);
+    ui->max_files = MIN(LINES / 2, UI_MAX_LINES);
     top_window = newwin(2, COLS, 0, 0);
     file_window = newwin(ui->max_files, COLS, 2, 0);
     bottom_window = newwin(2, COLS, 2 + ui->max_files, 0);
