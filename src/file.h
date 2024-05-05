@@ -39,3 +39,4 @@ void add_file(UI *ui, File *file);
 void free_file_list(UI *ui);
 void refresh_file_list(UI *ui);
 void set_directory(UI *ui, char *dirname);
+void ui_destroy(UI *ui);

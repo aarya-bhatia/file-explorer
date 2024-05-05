@@ -1,4 +1,5 @@
 #include "file.h"
+#include "sglib.h"
 #include "sort.h"
 #include "util.h"
 #include <assert.h>
@@ -31,7 +32,7 @@ void test_files()
     assert(get_file_index(ui, f1) == ui->scroll);
     assert(get_file_index(ui, f2) == ui->scroll + ui->max_files - 1);
 
-    free_file_list(ui);
+    ui_destroy(ui);
     free(ui);
 }
 
@@ -119,8 +120,39 @@ void test_sort()
     assert(head->next->next->next == NULL);
 }
 
+void test_sglib()
+{
+    File f1;
+    f1.name = "hello.txt";
+
+    File f2;
+    f2.name = "world.mp3";
+
+    File f3;
+    f3.name = "npm.log";
+
+    File *head = NULL;
+
+    SGLIB_DL_LIST_ADD(File, head, &f1, prev, next);
+    SGLIB_DL_LIST_ADD(File, head, &f2, prev, next);
+    SGLIB_DL_LIST_ADD(File, head, &f3, prev, next);
+
+    int res = 0;
+    SGLIB_DL_LIST_LEN(File, head, prev, next, res);
+
+    assert(res == 3);
+
+    SGLIB_DL_LIST_SORT(File, head, cmp_by_name, prev, next);
+    assert(head == &f1);
+    assert(head->next == &f3);
+    assert(head->next->next == &f2);
+    assert(head->next->next->next == NULL);
+}
+
 int main()
 {
-    /* test_files(); */
+    test_util();
+    test_files();
     test_sort();
+    test_sglib();
 }

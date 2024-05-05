@@ -73,12 +73,22 @@ void free_file_list(UI *ui)
 {
     while (ui->files) {
         File *tmp = ui->files->next;
+        free(ui->files->name);
         free(ui->files);
         ui->files = tmp;
     }
 
     ui->files = NULL;
     ui->selected = NULL;
+}
+
+void ui_destroy(UI *ui)
+{
+    free(ui->dirname);
+    free_file_list(ui);
+    ui->selected = NULL;
+    ui->files = NULL;
+    ui->dirname = NULL;
 }
 
 void set_directory(UI *ui, char *dirname)
