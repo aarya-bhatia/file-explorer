@@ -192,7 +192,7 @@ void display_top()
 void display_files()
 {
     assert(ui->dirname);
-    log_debug("display_files");
+    /* log_debug("display_files"); */
 
     werase(file_window);
     wmove(file_window, 0, 0);
