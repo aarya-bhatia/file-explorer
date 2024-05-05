@@ -125,7 +125,7 @@ void handle_goto_bottom()
 /* start find mode */
 void handle_start_find()
 {
-    if (!ui->files) {
+    if (!ui->files || !ui->selected) {
         return;
     }
     sprintf(status_message, "f");
@@ -135,10 +135,11 @@ void handle_start_find()
 /* find file with char prefix and exit find mode */
 void handle_find_key(char ch)
 {
+    assert(ui->selected);
     ui->mode = NORMAL_MODE;
     status_message[0] = 0;
 
-    File *A = get_top_file(ui);
+    File *A = ui->selected;
     File *B = get_bottom_file(ui);
 
     while (A && B && A != B->next) {
