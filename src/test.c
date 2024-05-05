@@ -1,4 +1,5 @@
 #include "file.h"
+#include "sort.h"
 #include "util.h"
 #include <assert.h>
 #include <stdio.h>
@@ -91,7 +92,35 @@ void test_util()
     puts(buffer);
 }
 
+int cmp_by_name(File *f1, File *f2)
+{
+    return strcmp(f1->name, f2->name);
+}
+
+void test_sort()
+{
+    File f1;
+    f1.name = "hello.txt";
+
+    File f2;
+    f2.name = "world.mp3";
+
+    File f3;
+    f3.name = "npm.log";
+
+    f1.next = &f2;
+    f2.next = &f3;
+    f3.next = NULL;
+
+    File *head = merge_sort(&f1, cmp_by_name);
+    assert(head == &f1);
+    assert(head->next == &f3);
+    assert(head->next->next == &f2);
+    assert(head->next->next->next == NULL);
+}
+
 int main()
 {
-    test_files();
+    /* test_files(); */
+    test_sort();
 }

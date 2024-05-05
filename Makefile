@@ -1,8 +1,8 @@
 CFLAGS=-c -std=c99 -Wall -pedantic -g -D_GNU_SOURCE
 LDFLAGS=-lncurses -lm
 
-MAIN_SRC=src/main.c src/log.c src/util.c src/file.c
-TEST_SRC=src/test.c src/log.c src/util.c src/file.c
+MAIN_SRC=src/main.c src/log.c src/util.c src/file.c src/sort.c
+TEST_SRC=src/test.c src/log.c src/util.c src/file.c src/sort.c
 
 MAIN_OBJ=$(MAIN_SRC:src/%.c=obj/%.o)
 TEST_OBJ=$(TEST_SRC:src/%.c=obj/%.o)

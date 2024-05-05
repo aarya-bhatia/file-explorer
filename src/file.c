@@ -143,6 +143,10 @@ void add_file(UI *ui, File *file)
     file->prev = f;
 }
 
+void sort_file_list(UI *ui)
+{
+}
+
 char **list_files(const char *dirname)
 {
     char **vector = calloc(1, sizeof *vector);
