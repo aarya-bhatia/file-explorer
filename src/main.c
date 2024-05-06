@@ -1,18 +1,30 @@
 #include "file.h"
 #include <ncurses.h>
+#include <stdio.h>
 #include <sys/stat.h>
 
 #define UI_MAX_LINES 50
 #define UI_MAX_PATH_LENGTH 30
 
-enum { COLOR_PAIR_NORMAL = 1, COLOR_PAIR_DIRECTORY, COLOR_PAIR_SYMLINK };
+enum {
+    COLOR_PAIR_NORMAL = 1,
+    COLOR_PAIR_DIRECTORY,
+    COLOR_PAIR_SYMLINK,
+
+    COLOR_PAIR_BLUE,
+    COLOR_PAIR_GREEN,
+    COLOR_PAIR_RED,
+    COLOR_PAIR_WHITE,
+    COLOR_PAIR_YELLOW,
+};
 
 void quit(int);
 void change_dir(char *);
-void display_top();
-void display_files();
-void display_bottom();
-
+void display_title_window();
+void display_file_window();
+void display_index_window();
+void display_help_window();
+void display_status_window();
 void handle_up_key();
 void handle_down_key();
 void handle_left_key();
@@ -25,8 +37,10 @@ void handle_find_key(char);
 UI *ui = NULL;
 
 WINDOW *file_window = NULL;
-WINDOW *top_window = NULL;
-WINDOW *bottom_window = NULL;
+WINDOW *title_window = NULL;
+WINDOW *index_window = NULL;
+WINDOW *status_window = NULL;
+WINDOW *help_window = NULL;
 
 char status_message[512];
 const char *username;
@@ -174,23 +188,23 @@ void change_dir(char *newdir)
     }
 }
 
-void display_top()
+void display_title_window()
 {
     assert(ui->dirname);
 
-    werase(top_window);
-    wmove(top_window, 0, 0);
+    werase(title_window);
+    wmove(title_window, 0, 0);
 
     if (strcmp(ui->dirname, "/") == 0) {
-        wprintw(top_window, "%s@%s:/%s\n\n", username, hostname, ui->dirname);
+        wprintw(title_window, "%s@%s:/%s\n", username, hostname, ui->dirname);
     } else {
-        wprintw(top_window, "%s@%s:%s\n\n", username, hostname, ui->dirname);
+        wprintw(title_window, "%s@%s:%s\n", username, hostname, ui->dirname);
     }
 
-    wrefresh(top_window);
+    wrefresh(title_window);
 }
 
-void display_files()
+void display_file_window()
 {
     assert(ui->dirname);
     /* log_debug("display_files"); */
@@ -244,12 +258,15 @@ void display_files()
             wprintw(file_window, " ");
         }
 
+        /* wattron(file_window, COLOR_PAIR(COLOR_PAIR_SYMLINK)); */
         get_human_size(f->stat.st_size, buffer, sizeof buffer - 1);
         wprintw(file_window, "%-6s", buffer);
 
+        /* wattron(file_window, COLOR_PAIR(COLOR_PAIR_INFO1)); */
         get_human_time(f->stat.st_mtim, buffer, sizeof buffer - 1);
         wprintw(file_window, "%-20s", buffer);
 
+        /* wattron(file_window, COLOR_PAIR(COLOR_PAIR_INFO2)); */
         get_perm_string(f->stat.st_mode, buffer, sizeof buffer - 1);
         wprintw(file_window, "%-16s", buffer);
 
@@ -259,30 +276,90 @@ void display_files()
     wrefresh(file_window);
 }
 
-void display_bottom()
+void display_index_window()
 {
     assert(ui->dirname);
 
-    werase(bottom_window);
-    wmove(bottom_window, 0, 0);
+    werase(index_window);
+    wmove(index_window, 0, 0);
 
-    if (ui->selected) {
-        wprintw(bottom_window, "\n[%d/%d]", get_file_index(ui, ui->selected), get_num_files(ui));
+    if (!ui->selected) {
+        wrefresh(index_window);
+        return;
+    }
+
+    char text[256];
+    int len = snprintf(text, sizeof text - 1, "[%d/%d]", get_file_index(ui, ui->selected), get_num_files(ui));
+    int width = COLS - COLS / 2;
+    if (len > width) {
+        text[width] = 0;
+    }
+
+    int padding = width - MIN(width, len);
+    for (int i = 0; i < padding; i++) {
+        wprintw(index_window, " ");
+    }
+
+    wprintw(index_window, "%s\n", text);
+    wrefresh(index_window);
+}
+
+void display_status_window()
+{
+    werase(status_window);
+    wmove(status_window, 0, 0);
+
+    if (ui->mode == NORMAL_MODE) {
+        wprintw(status_window, "-- NORMAL --");
+    } else if (ui->mode == FIND_MODE) {
+        wprintw(status_window, "-- FIND --");
     }
 
     if (strlen(status_message) > 0) {
-        wprintw(bottom_window, "\t\t%s", status_message);
+        wprintw(status_window, "  %s", status_message);
     }
 
-    wprintw(bottom_window, "\n");
-    wrefresh(bottom_window);
+    wrefresh(status_window);
+}
+
+void display_help_window()
+{
+    werase(help_window);
+    wmove(help_window, 0, 0);
+
+    char keys[] = {'?', 'q', 'f', 'g', 'G', 'k', 'j', 'h', 'l', 'K', 'J', 'o'};
+    char *items[] = {"Help", "Exit", "Jump",  "Goto Top",  "Goto Bottom", "Up",
+                     "Down", "Left", "Right", "Scroll Up", "Scroll Down", "OtherCmd"};
+    int count_per_row = 6;
+    const int item_width = COLS / count_per_row;
+
+    char trim[item_width + 1];
+
+    for (int i = 0; i < sizeof(keys); i++) {
+        snprintf(trim, item_width - 2, "%s", items[i]);
+
+        wattron(help_window, COLOR_PAIR(COLOR_PAIR_RED));
+        wprintw(help_window, "%c", keys[i]);
+        wattron(help_window, COLOR_PAIR(COLOR_PAIR_WHITE));
+        wprintw(help_window, " %s", trim);
+
+        for (int j = 0; j < item_width - strlen(trim) - 2; j++) {
+            wprintw(help_window, " ");
+        }
+
+        if (i % count_per_row == count_per_row - 1) {
+            wprintw(help_window, "\n");
+        }
+    }
+
+    wrefresh(help_window);
 }
 
 void quit(int exit_code)
 {
-    delwin(top_window);
+    delwin(title_window);
     delwin(file_window);
-    delwin(bottom_window);
+    delwin(index_window);
     endwin();
     exit(exit_code);
 }
@@ -335,9 +412,11 @@ int main(int argc, const char *argv[])
 
     ui->max_width = COLS;
     ui->max_files = MIN(LINES / 2, UI_MAX_LINES);
-    top_window = newwin(2, COLS, 0, 0);
+    title_window = newwin(2, COLS / 2, 0, 0);
+    index_window = newwin(2, COLS - (COLS / 2), 0, COLS / 2);
     file_window = newwin(ui->max_files, COLS, 2, 0);
-    bottom_window = newwin(2, COLS, 2 + ui->max_files, 0);
+    status_window = newwin(1, COLS, 1 + 2 + ui->max_files, 0);
+    help_window = newwin(2, COLS, 2 + 3 + ui->max_files, 0);
 
     log_debug("max files: %d", ui->max_files);
 
@@ -350,13 +429,21 @@ int main(int argc, const char *argv[])
     init_pair(COLOR_PAIR_DIRECTORY, COLOR_BLUE, COLOR_BLACK);
     init_pair(COLOR_PAIR_SYMLINK, COLOR_YELLOW, COLOR_BLACK);
 
+    init_pair(COLOR_PAIR_BLUE, COLOR_BLUE, COLOR_BLACK);
+    init_pair(COLOR_PAIR_GREEN, COLOR_GREEN, COLOR_BLACK);
+    init_pair(COLOR_PAIR_RED, COLOR_RED, COLOR_BLACK);
+    init_pair(COLOR_PAIR_WHITE, COLOR_WHITE, COLOR_BLACK);
+    init_pair(COLOR_PAIR_YELLOW, COLOR_YELLOW, COLOR_BLACK);
+
     refresh();
 
     // main loop
     while (1) {
-        display_top();
-        display_bottom();
-        display_files();
+        display_title_window();
+        display_index_window();
+        display_file_window();
+        display_help_window();
+        display_status_window();
 
         int ch = getch();
 
