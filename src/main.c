@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-#define UI_MAX_LINES 50
 #define UI_MAX_PATH_LENGTH 30
 
 enum {
@@ -146,7 +145,7 @@ void handle_start_find()
     if (!ui->files || !ui->selected) {
         return;
     }
-    sprintf(status_message, "f");
+    /* sprintf(status_message, "f"); */
     ui->mode = FIND_MODE;
 }
 
@@ -155,7 +154,7 @@ void handle_find_key(char ch)
 {
     assert(ui->selected);
     ui->mode = NORMAL_MODE;
-    status_message[0] = 0;
+    /* status_message[0] = 0; */
 
     File *A = ui->selected;
     File *B = get_bottom_file(ui);
@@ -207,7 +206,6 @@ void display_title_window()
 void display_file_window()
 {
     assert(ui->dirname);
-    /* log_debug("display_files"); */
 
     werase(file_window);
     wmove(file_window, 0, 0);
@@ -226,9 +224,6 @@ void display_file_window()
     max_name_width = MIN(max_name_width, UI_MAX_PATH_LENGTH);
 
     char buffer[256];
-
-    /* log_debug("top file: %s", get_top_file(ui)->name); */
-    /* log_debug("bottom file: %s", get_bottom_file(ui)->name); */
 
     for (File *f = get_top_file(ui); f && f != get_bottom_file(ui)->next; f = f->next) {
         snprintf(buffer, UI_MAX_PATH_LENGTH, "%s", f->name);
@@ -253,22 +248,19 @@ void display_file_window()
 
         wattron(file_window, COLOR_PAIR(COLOR_PAIR_NORMAL));
 
-        // padding
-        for (int j = 0; j < max_name_width - name_width + 1; j++) {
-            wprintw(file_window, " ");
-        }
+        /* // padding */
+        /* for (int j = 0; j < max_name_width - name_width + 1; j++) { */
+        /*     wprintw(file_window, " "); */
+        /* } */
 
-        /* wattron(file_window, COLOR_PAIR(COLOR_PAIR_SYMLINK)); */
-        get_human_size(f->stat.st_size, buffer, sizeof buffer - 1);
-        wprintw(file_window, "%-6s", buffer);
+        /* get_human_size(f->stat.st_size, buffer, sizeof buffer - 1); */
+        /* wprintw(file_window, "%-6s", buffer); */
 
-        /* wattron(file_window, COLOR_PAIR(COLOR_PAIR_INFO1)); */
-        get_human_time(f->stat.st_mtim, buffer, sizeof buffer - 1);
-        wprintw(file_window, "%-20s", buffer);
+        /* get_human_time(f->stat.st_mtim, buffer, sizeof buffer - 1); */
+        /* wprintw(file_window, "%-20s", buffer); */
 
-        /* wattron(file_window, COLOR_PAIR(COLOR_PAIR_INFO2)); */
-        get_perm_string(f->stat.st_mode, buffer, sizeof buffer - 1);
-        wprintw(file_window, "%-16s", buffer);
+        /* get_perm_string(f->stat.st_mode, buffer, sizeof buffer - 1); */
+        /* wprintw(file_window, "%-16s", buffer); */
 
         wprintw(file_window, "\n");
     }
@@ -411,7 +403,7 @@ int main(int argc, const char *argv[])
     }
 
     ui->max_width = COLS;
-    ui->max_files = MIN(LINES / 2, UI_MAX_LINES);
+    ui->max_files = LINES / 2;
     title_window = newwin(2, COLS / 2, 0, 0);
     index_window = newwin(2, COLS - (COLS / 2), 0, COLS / 2);
     file_window = newwin(ui->max_files, COLS, 2, 0);
@@ -442,7 +434,7 @@ int main(int argc, const char *argv[])
         display_title_window();
         display_index_window();
         display_file_window();
-        display_help_window();
+        /* display_help_window(); */
         display_status_window();
 
         int ch = getch();
