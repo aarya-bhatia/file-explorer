@@ -16,6 +16,8 @@ int num_files = 0;
 int selected = 0;
 int path_changed = 0;
 
+char prev_find_char = 0;
+
 enum { NORMAL_MODE, FIND_MODE } ui_mode = 0;
 
 char status_message[512];
@@ -108,6 +110,16 @@ void display_bottom()
     wrefresh(bottom_window);
 }
 
+void find_next(char ch)
+{
+    for (int i = selected + 1; i < MIN(max_files, num_files); i++) {
+        if (*file_vec[i] == ch) {
+            selected = i;
+            break;
+        }
+    }
+}
+
 int main(int argc, const char *argv[])
 {
     int logfile = open("stderr.log", O_CREAT | O_APPEND | O_WRONLY, 0640);
@@ -187,13 +199,8 @@ int main(int argc, const char *argv[])
         if (ui_mode == FIND_MODE) {
             ui_mode = NORMAL_MODE;
             status_message[0] = 0;
-
-            for (int i = selected + 1; i < MIN(max_files, num_files); i++) {
-                if (*file_vec[i] == ch) {
-                    selected = i;
-                    break;
-                }
-            }
+            prev_find_char = ch;
+            find_next(ch);
 
         } else {
             if (ch == 'q') {
@@ -217,6 +224,10 @@ int main(int argc, const char *argv[])
             } else if (ch == 'f') {
                 sprintf(status_message, "f");
                 ui_mode = FIND_MODE;
+            } else if (ch == ';' && prev_find_char != 0) {
+                find_next(prev_find_char);
+            } else if (ch == ',' && prev_find_char != 0) {
+                find_prev(prev_find_char);
             }
         }
     }
