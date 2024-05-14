@@ -116,7 +116,7 @@ void handle_scroll_up()
         ui->scroll--;
 
         if (!is_displayed(ui, ui->selected)) {
-            ui->selected = get_file_at_index(ui, ui->scroll);
+            ui->selected = get_bottom_file(ui);
         }
     }
 }
