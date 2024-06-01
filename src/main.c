@@ -17,7 +17,7 @@ enum {
     COLOR_PAIR_YELLOW,
 };
 
-void quit(int);
+void quit(int, char *);
 void change_dir(char *);
 void display_title_window();
 void display_file_window();
@@ -80,7 +80,13 @@ void handle_right_key()
         return;
     }
 
-    change_dir(path_join(ui->dirname, ui->selected->name));
+    char *filename = path_join(ui->dirname, ui->selected->name);
+
+    if (!is_valid_dir(filename)) {
+        quit(0, filename);
+    } else {
+        change_dir(filename);
+    }
 }
 
 /* Move to parent directory */
@@ -181,9 +187,11 @@ void change_dir(char *newdir)
     if (is_valid_dir(newdir)) {
         set_directory(ui, newdir);
         log_debug("cd: %s", ui->dirname);
+        return;
     } else {
         log_error("cd failed: %s", newdir);
         free(newdir);
+        return;
     }
 }
 
@@ -347,12 +355,14 @@ void display_help_window()
     wrefresh(help_window);
 }
 
-void quit(int exit_code)
+void quit(int exit_code, char *message)
 {
     delwin(title_window);
     delwin(file_window);
     delwin(index_window);
     endwin();
+    if (message)
+        puts(message);
     exit(exit_code);
 }
 
@@ -444,7 +454,7 @@ int main(int argc, const char *argv[])
 
                 switch (ch) {
                     case 'q':
-                        quit(0);
+                        quit(0, NULL);
                         break;
 
                     case 'j':
@@ -496,5 +506,5 @@ int main(int argc, const char *argv[])
         }
     }
 
-    quit(0);
+    quit(0, NULL);
 }
